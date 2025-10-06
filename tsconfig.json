@@ -20,9 +20,9 @@
     "*.ts"
   ],
   "files": [
-    "dayplanner.ts",
+    "AIHistoricalContextAgent.ts",
     "gemini-llm.ts",
-    "dayplanner-tests.ts"
+    "AIHistoricalContextAgent-tests.ts"
   ],
   "exclude": [
     "node_modules",

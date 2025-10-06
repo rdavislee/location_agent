@@ -1,182 +1,76 @@
-# DayPlanner 
-A simple day planner. This implementation focuses on the core concept of organizing activities for a single day with both manual and AI-assisted scheduling.
+# Original concept: Concept HistoricalContextAgent
 
-## Concept: DayPlanner
+**Purpose:** generate location-aware historical narratives
 
-**Purpose**: Help you organize activities for a single day  
-**Principle**: You can add activities one at a time, assign them to times, and then observe the completed schedule
+**Principle:** given a location and radius, synthesize relevant historical information into engaging context; answer follow-up questions grounded in that context
 
-### Core State
-- **Activities**: Set of activities with title, duration, and optional startTime
-- **Assignments**: Set of activity-to-time assignments
-- **Time System**: All times in half-hour slots starting at midnight (0 = 12:00 AM, 13 = 6:30 AM)
+## State:
+A set of ActiveContexts with:
+- A sessionId String
+- A baseContext String (the generated historical narrative)
+- A location Coordinates
+- A radius Number
 
-### Core Actions
-- `addActivity(title: string, duration: number): Activity`
-- `removeActivity(activity: Activity)`
-- `assignActivity(activity: Activity, startTime: number)`
-- `unassignActivity(activity: Activity)`
-- `requestAssignmentsFromLLM()` - AI-assisted scheduling with hardwired preferences
+## Actions:
 
-## Prerequisites
+### generateContext(location: Coordinates, radius: Number): (context: String, mainLocation: String, sessionId: String)
+- **Requires:** valid coordinates and positive radius
+- **Effects:** Queries historical sources for location within radius, generates narrative context, identifies most significant location as mainLocation, creates ActiveContext with new sessionId
+- **Returns:** context narrative, main location name, session id
 
-- **Node.js** (version 14 or higher)
-- **TypeScript** (will be installed automatically)
-- **Google Gemini API Key** (free at [Google AI Studio](https://makersuite.google.com/app/apikey))
+### answerQuestion(sessionId: String, question: String): (answer: String)
+- **Requires:** ActiveContext exists with sessionId
+- **Effects:** Generates answer based on baseContext and question
+- **Returns:** answer grounded in historical context
 
-## Quick Setup
+### clearSession(sessionId: String)
+- **Requires:** ActiveContext exists with sessionId
+- **Effects:** Removes ActiveContext from set
 
-### 0. Clone the repo locally and navigate to it
-```cd intro-gemini-schedule```
+## AI Augmented
+I've chosen to augment the context generation. Instead of using an integration with google maps to find nearby locations and some kind of popularity measure to find historical landmarks, we can simply hand the coordinates and radius to the AI and have it return the context. Without the automation to generate the context, there would be way too much friction, making the application obsolete versus simply using google.
 
-### 1. Install Dependencies
+# Concept AIHistoricalContextAgent
 
-```bash
-npm install
-```
+**Purpose:** generate location-aware historical narratives
 
-### 2. Add Your API Key
+**Principle:** given a location and radius, synthesize relevant historical information into engaging context; answer follow-up questions grounded in that context
 
-**Why use a template?** The `config.json` file contains your private API key and should never be committed to version control. The template approach lets you:
-- Keep the template file in git (safe to share)
-- Create your own `config.json` locally (keeps your API key private)
-- Easily set up the project on any machine
+## State:
+A set of ActiveContexts with:
+- A sessionId String
+- A baseContext String (the generated historical narrative)
+- A location Coordinates
+- A radius Number
 
-**Step 1:** Copy the template file:
-```bash
-cp config.json.template config.json
-```
+## Actions:
 
-**Step 2:** Edit `config.json` and add your API key:
-```json
-{
-  "apiKey": "YOUR_GEMINI_API_KEY_HERE"
-}
-```
+### generateContext(location: Coordinates, radius: Number): (context: String, mainLocation: String, sessionId: String)
+- **Requires:** valid coordinates and positive radius
+- **Effects:** AI generates narrative context, identifies most significant location as mainLocation, creates ActiveContext with new sessionId
+- **Returns:** context narrative, main location name, session id
 
-**To get your API key:**
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy the key and paste it into `config.json` (replacing `YOUR_GEMINI_API_KEY_HERE`)
+### answerQuestion(sessionId: String, question: String): (answer: String)
+- **Requires:** ActiveContext exists with sessionId
+- **Effects:** AI Generates answer based on baseContext and question, adds question/answer pair to base context
+- **Returns:** answer grounded in historical context
 
-### 3. Run the Application
+### clearSession(sessionId: String)
+- **Requires:** ActiveContext exists with sessionId
+- **Effects:** Removes ActiveContext from set
 
-**Run all test cases:**
-```bash
-npm start
-```
+## UI Sketch:
 
-**Run specific test cases:**
-```bash
-npm run manual    # Manual scheduling only
-npm run llm       # LLM-assisted scheduling only
-npm run mixed     # Mixed manual + LLM scheduling
-```
+![UI Sketch](assets/image1.png)
 
-## File Structure
+## Test Case 1: Boston Historical Context with Follow-up Questions
+The first test case validates the core functionality using Boston coordinates. The system generates historical context for the area, then answers two follow-up questions: one about top schools (which must mention Harvard) and one about the body of water (which must mention Atlantic). This test ensures the agent can both generate rich historical narratives and answer contextual questions by drawing on both the generated context and broader geographic knowledge of the area.
 
-```
-dayplanner/
-├── package.json              # Dependencies and scripts
-├── tsconfig.json             # TypeScript configuration
-├── config.json               # Your Gemini API key
-├── dayplanner-types.ts       # Core type definitions
-├── dayplanner.ts             # DayPlanner class implementation
-├── dayplanner-llm.ts         # LLM integration
-├── dayplanner-tests.ts       # Test cases and examples
-├── dist/                     # Compiled JavaScript output
-└── README.md                 # This file
-```
+## Test Case 2: Multi-Scale Context with Radius-Based Main Location
+The second test demonstrates how the main location should scale appropriately with the radius. Using the same Boston coordinates, we test three radii: a small radius (500m) should return a specific landmark like "Old State House" rather than just "Boston"; a medium radius (10km) should return the city name "Boston"; and a large radius (500km) should return a regional name like "New England" rather than a city. The prompts explicitly guide the LLM to match the geographic scale to the radius, ensuring users get appropriately scoped historical context.
 
-## Test Cases
+## Test Case 3: Desolate Location with No Historical Context
+The third test uses Point Nemo coordinates in the middle of the Pacific Ocean to verify the system can recognize when there is genuinely no historical context. For truly desolate locations with small radii, the system should return "No significant historical location" rather than fabricating content. This test demonstrates the system's ability to appropriately decline providing context when none exists, catching cases where the LLM might hallucinate land-based locations in oceanic coordinates.
 
-The application includes three comprehensive test cases:
-
-### 1. Manual Scheduling
-Demonstrates adding activities and manually assigning them to time slots:
-
-```typescript
-const planner = new DayPlanner();
-const breakfast = planner.addActivity('Breakfast', 1); // 30 minutes
-planner.assignActivity(breakfast, 14); // 7:00 AM
-```
-
-### 2. LLM-Assisted Scheduling
-Shows AI-powered scheduling with hardwired preferences:
-
-```typescript
-const planner = new DayPlanner();
-planner.addActivity('Morning Jog', 2);
-planner.addActivity('Math Homework', 4);
-await llm.requestAssignmentsFromLLM(planner);
-```
-
-### 3. Mixed Scheduling
-Combines manual assignments with AI assistance for remaining activities.
-
-## Sample Output
-
-```
-📅 Daily Schedule
-==================
-7:00 AM - Breakfast (30 min)
-8:00 AM - Morning Workout (1 hours)
-10:00 AM - Study Session (1.5 hours)
-1:00 PM - Lunch (30 min)
-3:00 PM - Team Meeting (1 hours)
-7:00 PM - Dinner (30 min)
-9:00 PM - Evening Reading (1 hours)
-
-📋 Unassigned Activities
-========================
-All activities are assigned!
-```
-
-## Key Features
-
-- **Simple State Management**: Activities and assignments stored in memory
-- **Flexible Time System**: Half-hour slots from midnight (0-47)
-- **Query-Based Display**: Schedule generated on-demand, not stored sorted
-- **AI Integration**: Hardwired preferences in LLM prompt (no external hints)
-- **Conflict Detection**: Prevents overlapping activities
-- **Clean Architecture**: First principles implementation with no legacy code
-
-## LLM Preferences (Hardwired)
-
-The AI uses these built-in preferences:
-- Exercise activities: Morning (6:00 AM - 10:00 AM)
-- Study/Classes: Focused hours (9:00 AM - 5:00 PM)
-- Meals: Regular intervals (breakfast 7-9 AM, lunch 12-1 PM, dinner 6-8 PM)
-- Social/Relaxation: Evenings (6:00 PM - 10:00 PM)
-- Avoid: Demanding activities after 10:00 PM
-
-## Troubleshooting
-
-### "Could not load config.json"
-- Ensure `config.json` exists with your API key
-- Check JSON format is correct
-
-### "Error calling Gemini API"
-- Verify API key is correct
-- Check internet connection
-- Ensure API access is enabled in Google AI Studio
-
-### Build Issues
-- Use `npm run build` to compile TypeScript
-- Check that all dependencies are installed with `npm install`
-
-## Next Steps
-
-Try extending the DayPlanner:
-- Add weekly scheduling
-- Implement activity categories
-- Add location information
-- Create a web interface
-- Add conflict resolution strategies
-- Implement recurring activities
-
-## Resources
-
-- [Google Generative AI Documentation](https://ai.google.dev/docs)
-- [TypeScript Documentation](https://www.typescriptlang.org/docs/)
+## Validators: Retry Loop with Secondary Agent Review
+I implemented a retry loop (up to 3 attempts) with two-stage validation. First, we validate that the JSON output is correctly formatted. Second, a secondary agent reviews the response for hallucinations, checking geographic accuracy (especially hemisphere mismatches), verifying the claimed location exists at the given coordinates, and ensuring desolate locations aren't assigned fabricated historical content. When validation fails, the error reason is added to the next prompt, allowing the LLM to learn from its mistakes and self-correct rather than repeatedly making the same error.
