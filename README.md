@@ -10,6 +10,7 @@ A set of ActiveContexts with:
 - A baseContext String (the generated historical narrative)
 - A location Coordinates
 - A radius Number
+- A mainLocation String
 
 ## Actions:
 
@@ -42,6 +43,7 @@ A set of ActiveContexts with:
 - A baseContext String (the generated historical narrative)
 - A location Coordinates
 - A radius Number
+- A mainLocation String
 
 ## Actions:
 
